@@ -110,14 +110,13 @@ def enroll(request, course_id):
          # Collect the selected choices from exam form
          # Add each selected choice object to the submission object
          # Redirect to show_exam_result with the submission id
+            
 def submit(request, course_id):
-    course = get_object_or_404(Course, pk=course_id)
-    user = request.user
-    if not is_enrolled and user.is_authenticated:
-       enrollment = Enrollment.objects.get(user=user, course=course, mode='honor')
-       Submission.objects.create(enrollment=enrollment)
-    return HttpResponseRedirect(reverse(viewname='onlinecourse:course_details', args=(course.id,)))
-
+    enrollment = Enrollment.objects.get(user=request.user, course=course_id)
+    submission = Submission.objects.create(enrollment=enrollment)
+    submitted_answers = extract_answers(request)
+    submission.choices.set(submitted_answers)
+    return HttpResponseRedirect(reverse(viewname='onlinecourse:show_exam_result', args=(course_id, submission.pk)))
 
 # <HINT> A example method to collect the selected choices from the exam form from the request object
 def extract_answers(request):
@@ -137,7 +136,19 @@ def extract_answers(request):
         # For each selected choice, check if it is a correct answer or not
         # Calculate the total score
 def show_exam_result(request, course_id, submission_id):
-    course = get_object_or_404(Course, pk=course_id)
-    submission = get_object_or_404(Submission, pk=submission_id)
-    # for course in courses:
+    context = {}
+    context['submission'] = []
+    all_points = 0
+    score = 0
+    course = Course.objects.get(pk=course_id)
+    submission = Submission.objects.get(pk=submission_id)
+    questions = Question.objects.filter(course=course)
+    for each in questions:
+        all_points += each.grade
+        if each.is_get_score(submission.choices.all()):
+            score += each.grade
+    context['grade'] = int(score/all_points * 100)
+    context['course'] = course
+
+    return render(request, 'onlinecourse/exam_result_bootstrap.html', context)
 
